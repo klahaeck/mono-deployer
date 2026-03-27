@@ -112,68 +112,68 @@ function getFileExtension(mimeType: string): string {
   return ext ? ext : '';
 }
 
-async function uploadAsset(url: string) {
-  // const flattendUrls = urls.flat()
-  // const deDupedUrls = uniq(flattendUrls)
+// async function uploadAsset(url: string) {
+//   // const flattendUrls = urls.flat()
+//   // const deDupedUrls = uniq(flattendUrls)
 
-  // for (const url of deDupedUrls) {
-  // console.log(url)
-  const urlObj = new URL(url);
-  // console.log('urlObj.searchParams:', urlObj.searchParams)
-  // console.log('urlObj.search:', urlObj.search)
+//   // for (const url of deDupedUrls) {
+//   // console.log(url)
+//   const urlObj = new URL(url);
+//   // console.log('urlObj.searchParams:', urlObj.searchParams)
+//   // console.log('urlObj.search:', urlObj.search)
   
-  // Ensure we have alt=media parameter to get the actual image content
-  if (!urlObj.searchParams.has('alt')) {
-    urlObj.searchParams.set('alt', 'media');
-  }
+//   // Ensure we have alt=media parameter to get the actual image content
+//   // if (!urlObj.searchParams.has('alt')) {
+//   //   urlObj.searchParams.set('alt', 'media');
+//   // }
   
-  // Use the original URL with token and apiKey for fetching
-  const fetchUrl = urlObj.href;
+//   // Use the original URL with token and apiKey for fetching
+//   const fetchUrl = urlObj.href;
   
-  const fullPath = urlObj.pathname;
-  // Ensure the pathname is properly decoded to prevent %2F and other encoded characters
-  const decodedPath = safeDecodePath(fullPath);
-  const noSlashFullPath = decodedPath.replace(/^\/+/, '');
+//   const fullPath = urlObj.pathname;
+//   // Ensure the pathname is properly decoded to prevent %2F and other encoded characters
+//   const decodedPath = safeDecodePath(fullPath);
+//   const noSlashFullPath = decodedPath.replace(/^\/+/, '');
 
-  const response = await fetch(fetchUrl);
-  if (!response.ok) {
-    console.error(`Error fetching file from ${url}`);
-    throw new Error(`Error fetching file from ${url}: ${response.status} ${response.statusText}`);
-  }
+//   const response = await fetch(fetchUrl);
+//   if (!response.ok) {
+//     console.error(`Error fetching file from ${url}`);
+//     throw new Error(`Error fetching file from ${url}: ${response.status} ${response.statusText}`);
+//   }
 
-  const contentType = response.headers.get('content-type');
-  const ext = getFileExtension(contentType || '');
+//   const contentType = response.headers.get('content-type');
+//   const ext = getFileExtension(contentType || '');
 
-  const arrayBuffer = await response.arrayBuffer();
-  const fileBuffer = Buffer.from(arrayBuffer);
+//   const arrayBuffer = await response.arrayBuffer();
+//   const fileBuffer = Buffer.from(arrayBuffer);
 
-  const s3_key = `${noSlashFullPath}${ext ? `.${ext}` : ''}`;
+//   const s3_key = `${noSlashFullPath}${ext ? `.${ext}` : ''}`;
 
-  const params: any = {
-    Bucket: process.env.AWS_BUCKET_NAME,
-    Key: `builder/${s3_key}`,
-    Body: fileBuffer,
-    ContentType: contentType,
-  };
+//   const params: any = {
+//     Bucket: process.env.AWS_BUCKET_NAME,
+//     Key: `builder/${s3_key}`,
+//     Body: fileBuffer,
+//     ContentType: contentType,
+//   };
 
-  const responseUrl = new URL(`${publicDomain}/${s3_key}`);
-  // responseUrl.search = urlObj.searchParams.toString();
+//   const responseUrl = new URL(`${publicDomain}/${s3_key}`);
+//   // responseUrl.search = urlObj.searchParams.toString();
 
-  try {
-    await s3.upload(params).promise();
-    // console.log(`Successfully uploaded file ${s3_key}`)
-    const returnData = {
-      key: `builder/${s3_key}`,
-      url: responseUrl.href,
-      // ext,
-    };
-    console.log(returnData);
-    return returnData;
-  } catch (err) {
-    console.error('Error uploading file', err);
-    throw err;
-  }
-}
+//   try {
+//     await s3.upload(params).promise();
+//     // console.log(`Successfully uploaded file ${s3_key}`)
+//     const returnData = {
+//       key: `builder/${s3_key}`,
+//       url: responseUrl.href,
+//       // ext,
+//     };
+//     console.log(returnData);
+//     return returnData;
+//   } catch (err) {
+//     console.error('Error uploading file', err);
+//     throw err;
+//   }
+// }
 
 async function replaceUrls(
   obj: any,
@@ -219,11 +219,12 @@ async function replaceUrls(
             // Use the original encoded URL for fetching, but extract URL from decoded version for processing
             const fetchUrlObj = new URL(match);
             fetchUrlObj.searchParams.delete('width');
+            fetchUrlObj.searchParams.delete('alt');
 
             // Ensure we have alt=media parameter to get the actual image content
-            if (!fetchUrlObj.searchParams.has('alt')) {
-              fetchUrlObj.searchParams.set('alt', 'media');
-            }
+            // if (!fetchUrlObj.searchParams.has('alt')) {
+            //   fetchUrlObj.searchParams.set('alt', 'media');
+            // }
             
             const fetchUrl = fetchUrlObj.href;
 
@@ -231,9 +232,10 @@ async function replaceUrls(
             extractedUrlObj.searchParams.delete('width');
 
             // Ensure we have alt=media parameter to get the actual image content
-            if (!extractedUrlObj.searchParams.has('alt')) {
-              extractedUrlObj.searchParams.set('alt', 'media');
-            }
+            // if (!extractedUrlObj.searchParams.has('alt')) {
+            //   extractedUrlObj.searchParams.set('alt', 'media');
+            // }
+            extractedUrlObj.searchParams.delete('alt');
 
             // console.log('extractedUrlObj:', extractedUrlObj)
             // console.log('extractedUrlObj.searchParams:', extractedUrlObj.searchParams)
@@ -282,37 +284,44 @@ async function replaceUrls(
             //   throw new Error('AWS_BUCKET_NAME is not defined')
             // }
 
-            const headParams = {
-              Bucket: process.env.AWS_BUCKET_NAME!,
-              Key: `builder/${s3_key}`,
-            };
+            // const headParams = {
+            //   Bucket: process.env.AWS_BUCKET_NAME!,
+            //   Key: `builder/${s3_key}`,
+            // };
             // console.log('headParams:', headParams)
 
-            let uploadedFile: any;
+            // let uploadedFile: any;
 
-            try {
-              await s3.headObject(headParams).promise();
-              // console.log(headers)
-              // console.log('File already exists in S3')
-              uploadedFile = {
-                key: `builder/${s3_key}`,
-                url: `${publicDomain}/${s3_key}`,
-                // ext: fileExtension,
-              };
-              // console.log(uploadedFile)
-            } catch (err: any) {
-              // console.log(err)
-              if (err.code === 'NotFound') {
-                // console.log('File does not exist in S3')
-                uploadedFile = await uploadAsset(extractedUrl);
-                // console.log(upload)
-              } else {
-                console.error('Error checking if file exists in S3', err);
-                throw err;
-              }
-            }
+            // try {
+            //   await s3.headObject(headParams).promise();
+            //   // console.log(headers)
+            //   // console.log('File already exists in S3')
+            //   uploadedFile = {
+            //     key: `builder/${s3_key}`,
+            //     url: `${publicDomain}/${s3_key}`,
+            //     // ext: fileExtension,
+            //   };
+            //   // console.log(uploadedFile)
+            // } catch (err: any) {
+            //   // console.log(err)
+            //   if (err.code === 'NotFound') {
+            //     // console.log('File does not exist in S3')
+            //     uploadedFile = await uploadAsset(extractedUrl);
+            //     // console.log(upload)
+            //   } else {
+            //     console.error('Error checking if file exists in S3', err);
+            //     throw err;
+            //   }
+            // }
+
+            const uploadedFile = {
+              key: `builder/${s3_key}`,
+              url: `${publicDomain}/${s3_key}`,
+              // ext: fileExtension,
+            };
 
             const newUrl = uploadedFile.url;
+            // console.log('newUrl:', newUrl);
             // const newUrl = `${publicDomain}/${s3_key}`
             obj[key] = obj[key].replace(match, newUrl);
 
@@ -458,7 +467,7 @@ export const pushToEnvironment = async (pageId?: string) => {
       // }
       // const localFilePath = path.join(outputDir, fileName);
       // writeFileSync(localFilePath, JSON.stringify(page, null, 2), 'utf8');
-      console.log(`Successfully uploaded file ${s3_key}`);
+      console.log(`Successfully uploaded page ${s3_key}`);
     } catch (err) {
       console.error('Error uploading file', err);
       throw err;
