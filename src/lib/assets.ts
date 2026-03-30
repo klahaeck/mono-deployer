@@ -1,6 +1,5 @@
 // import dotenv from 'dotenv';
 import path from 'path';
-import { Readable } from 'node:stream';
 import * as AWS from 'aws-sdk';
 import { createAdminApiClient } from '@builder.io/admin-sdk';
 
@@ -205,25 +204,13 @@ async function fetchAllAssets(): Promise<AssetRow[]> {
 
 type UploadAssetResult = { key: string; url: string; didUpload: boolean };
 
-async function objectExistsOnS3(bucket: string, key: string): Promise<boolean> {
-  try {
-    await s3.headObject({ Bucket: bucket, Key: key }).promise();
-    return true;
-  } catch (err: unknown) {
-    if (isS3NotFound(err)) return false;
-    throw err;
-  }
-}
-
 async function uploadAssetToS3(asset: AssetRow): Promise<UploadAssetResult> {
   const urlObj = new URL(asset.url);
   const fetchUrl = urlObj.href;
-  const bucket = process.env.AWS_BUCKET_NAME!;
 
   let headerContentType: string | null = null;
-  let parts = computeS3KeyParts(asset, urlObj, null);
-
-  if (!parts.ext) {
+  const tentative = computeS3KeyParts(asset, urlObj, null);
+  if (!tentative.ext) {
     try {
       const headRes = await fetch(fetchUrl, { method: 'HEAD' });
       if (headRes.ok) {
@@ -232,15 +219,21 @@ async function uploadAssetToS3(asset: AssetRow): Promise<UploadAssetResult> {
     } catch {
       // ignore
     }
-    parts = computeS3KeyParts(asset, urlObj, headerContentType);
   }
 
-  if (await objectExistsOnS3(bucket, parts.s3Key)) {
+  let parts = computeS3KeyParts(asset, urlObj, headerContentType);
+
+  const bucket = process.env.AWS_BUCKET_NAME!;
+
+  try {
+    await s3.headObject({ Bucket: bucket, Key: parts.s3Key }).promise();
     return {
       key: parts.s3Key,
       url: `${publicDomain}/${parts.s3RelativeKey}`,
       didUpload: false,
     };
+  } catch (err: unknown) {
+    if (!isS3NotFound(err)) throw err;
   }
 
   const response = await fetch(fetchUrl);
@@ -251,48 +244,49 @@ async function uploadAssetToS3(asset: AssetRow): Promise<UploadAssetResult> {
   }
 
   const getHeader = response.headers.get('content-type');
-  const finalParts = computeS3KeyParts(asset, urlObj, getHeader);
+  parts = computeS3KeyParts(asset, urlObj, getHeader);
   const contentType = normalizeContentType(asset.type, getHeader);
 
-  if (finalParts.s3Key !== parts.s3Key) {
-    if (await objectExistsOnS3(bucket, finalParts.s3Key)) {
-      if (response.body) await response.body.cancel();
-      return {
-        key: finalParts.s3Key,
-        url: `${publicDomain}/${finalParts.s3RelativeKey}`,
-        didUpload: false,
-      };
-    }
+  try {
+    await s3.headObject({ Bucket: bucket, Key: parts.s3Key }).promise();
+    void response.body?.cancel();
+    return {
+      key: parts.s3Key,
+      url: `${publicDomain}/${parts.s3RelativeKey}`,
+      didUpload: false,
+    };
+  } catch (err: unknown) {
+    if (!isS3NotFound(err)) throw err;
   }
 
-  console.log('uploading file:', `${publicDomain}/${finalParts.s3RelativeKey}`);
+  const arrayBuffer = await response.arrayBuffer();
+  const fileBuffer = Buffer.from(arrayBuffer);
 
-  const body = response.body;
-  if (!body) {
-    const fileBuffer = Buffer.from(await response.arrayBuffer());
-    await s3
-      .upload({
-        Bucket: bucket,
-        Key: finalParts.s3Key,
-        Body: fileBuffer,
-        ContentType: contentType,
-      })
-      .promise();
-  } else {
-    const nodeStream = Readable.fromWeb(body as import('stream/web').ReadableStream);
-    await s3
-      .upload({
-        Bucket: bucket,
-        Key: finalParts.s3Key,
-        Body: nodeStream,
-        ContentType: contentType,
-      })
-      .promise();
+  try {
+    await s3.headObject({ Bucket: bucket, Key: parts.s3Key }).promise();
+    return {
+      key: parts.s3Key,
+      url: `${publicDomain}/${parts.s3RelativeKey}`,
+      didUpload: false,
+    };
+  } catch (err: unknown) {
+    if (!isS3NotFound(err)) throw err;
   }
+
+  console.log('uploading file:', `${publicDomain}/${parts.s3RelativeKey}`);
+
+  await s3
+    .upload({
+      Bucket: bucket,
+      Key: parts.s3Key,
+      Body: fileBuffer,
+      ContentType: contentType,
+    })
+    .promise();
 
   return {
-    key: finalParts.s3Key,
-    url: `${publicDomain}/${finalParts.s3RelativeKey}`,
+    key: parts.s3Key,
+    url: `${publicDomain}/${parts.s3RelativeKey}`,
     didUpload: true,
   };
 }
