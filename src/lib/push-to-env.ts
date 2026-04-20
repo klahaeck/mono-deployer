@@ -350,9 +350,8 @@ export const pushToEnvironment = async (pageId?: string) => {
           options: {
             includeUnpublished: false,
             includeRefs: true,
+            cachebust: true,
           },
-          cacheSeconds: 10,
-          staleCacheSeconds: 10,
           canTrack: false,
         }),
       ]
@@ -362,10 +361,9 @@ export const pushToEnvironment = async (pageId?: string) => {
         options: {
           includeUnpublished: false,
           includeRefs: true,
+          cachebust: true,
         },
         limit: 100,
-        cacheSeconds: 10,
-        staleCacheSeconds: 10,
         canTrack: false,
       });
 
@@ -403,13 +401,12 @@ export const pushToEnvironment = async (pageId?: string) => {
         options: {
           includeUnpublished: false,
           includeRefs: true,
+          cachebust: true,
         },
         query: {
           id: symbolId,
         },
         fields: 'data.blocks',
-        cacheSeconds: 10,
-        staleCacheSeconds: 10,
         canTrack: false,
       });
 
